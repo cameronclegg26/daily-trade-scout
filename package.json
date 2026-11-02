@@ -1,0 +1,23 @@
+{
+  "name": "daily-trade-scout",
+  "private": true,
+  "type": "module",
+  "description": "Weekday market-research desk. Educational only. Never places orders.",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "validate": "agent-sdk validate --dir .",
+    "dev": "agent-sdk dev",
+    "info": "agent-sdk info --dir ."
+  },
+  "dependencies": {
+    "@grok/agent-sdk": "0.5.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "typescript": "6.0.3"
+  }
+}
