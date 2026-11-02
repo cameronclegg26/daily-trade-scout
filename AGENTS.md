@@ -21,6 +21,7 @@ Run the CLI under Node, never Bun.
 - `bot/instructions.md` is the always-on prompt. Keep it short.
 - `bot/tools/<name>.ts` is one tool per file. The filename is the tool name.
 - `bot/lib/` is shared code. Never discovered.
+- `scanner/` is the no-token rules scan (`npm run scan`). It writes alerts only.
 - `evals/` is filesystem evals (`evals/evals.config.ts` required).
   Not `bot/evals/`. That path is ignored.
 

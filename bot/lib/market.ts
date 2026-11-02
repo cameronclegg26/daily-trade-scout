@@ -14,7 +14,7 @@ const POOL = 4;
 const USER_AGENT =
   "daily-trade-scout/0.1 (educational research; +https://github.com/cameronclegg26/daily-trade-scout)";
 
-export type AssetClass = "stock" | "grain" | "metal" | "energy" | "crypto" | "unknown";
+export type AssetClass = "stock" | "index" | "fx" | "grain" | "metal" | "energy" | "crypto" | "unknown";
 export type Sleeve = "sabio" | "phantom" | "none";
 
 export type Instrument = {
@@ -29,7 +29,11 @@ export type Instrument = {
 /** Desk universe. Sabio Trade is the prop book. Phantom is the small crypto sleeve. */
 export const UNIVERSE: readonly Instrument[] = [
   { id: "SPY", name: "S&P 500 ETF", assetClass: "stock", sleeve: "sabio", yahoo: "SPY" },
+  { id: "US500", name: "S&P 500 future (US500)", assetClass: "index", sleeve: "sabio", yahoo: "ES=F" },
+  { id: "US30", name: "Dow future (US30)", assetClass: "index", sleeve: "sabio", yahoo: "YM=F" },
   { id: "QQQ", name: "Nasdaq-100 ETF", assetClass: "stock", sleeve: "sabio", yahoo: "QQQ" },
+  { id: "SQQQ", name: "Inverse 3x Nasdaq ETF", assetClass: "stock", sleeve: "sabio", yahoo: "SQQQ" },
+  { id: "TQQQ", name: "3x Nasdaq ETF", assetClass: "stock", sleeve: "sabio", yahoo: "TQQQ" },
   { id: "IWM", name: "Russell 2000 ETF", assetClass: "stock", sleeve: "sabio", yahoo: "IWM" },
   { id: "AAPL", name: "Apple", assetClass: "stock", sleeve: "sabio", yahoo: "AAPL" },
   { id: "MSFT", name: "Microsoft", assetClass: "stock", sleeve: "sabio", yahoo: "MSFT" },
@@ -40,9 +44,15 @@ export const UNIVERSE: readonly Instrument[] = [
   { id: "CORN", name: "CBOT corn", assetClass: "grain", sleeve: "sabio", yahoo: "ZC=F" },
   { id: "SOY", name: "CBOT soybeans", assetClass: "grain", sleeve: "sabio", yahoo: "ZS=F" },
   { id: "COPPER", name: "COMEX copper", assetClass: "metal", sleeve: "sabio", yahoo: "HG=F" },
+  { id: "GOLD", name: "COMEX gold", assetClass: "metal", sleeve: "sabio", yahoo: "GC=F" },
   { id: "WTI", name: "WTI crude", assetClass: "energy", sleeve: "sabio", yahoo: "CL=F" },
+  { id: "GBPUSD", name: "GBP/USD", assetClass: "fx", sleeve: "sabio", yahoo: "GBPUSD=X" },
+  { id: "EURUSD", name: "EUR/USD", assetClass: "fx", sleeve: "sabio", yahoo: "EURUSD=X" },
+  { id: "USDJPY", name: "USD/JPY", assetClass: "fx", sleeve: "sabio", yahoo: "JPY=X" },
   { id: "BTC", name: "Bitcoin", assetClass: "crypto", sleeve: "phantom", yahoo: "BTC-USD", coingecko: "bitcoin" },
+  { id: "ETH", name: "Ethereum", assetClass: "crypto", sleeve: "phantom", yahoo: "ETH-USD", coingecko: "ethereum" },
   { id: "SOL", name: "Solana", assetClass: "crypto", sleeve: "phantom", yahoo: "SOL-USD", coingecko: "solana" },
+  { id: "ZEC", name: "Zcash", assetClass: "crypto", sleeve: "phantom", yahoo: "ZEC-USD", coingecko: "zcash" },
   {
     id: "HYPE",
     name: "Hyperliquid",
@@ -185,7 +195,7 @@ function selectInstruments(ids: string[] | undefined):
   | { ok: true; instruments: Instrument[] }
   | { ok: false; error: string } {
   if (!ids || ids.length === 0) return { ok: true, instruments: [...UNIVERSE] };
-  if (ids.length > 20) return { ok: false, error: "At most 20 instruments per call." };
+  if (ids.length > 32) return { ok: false, error: "At most 32 instruments per call." };
   const instruments: Instrument[] = [];
   const missing: string[] = [];
   for (const raw of ids) {
@@ -431,6 +441,8 @@ function readQuote(value: unknown): StoredQuote | null {
 function isAssetClass(value: unknown): value is AssetClass {
   return (
     value === "stock" ||
+    value === "index" ||
+    value === "fx" ||
     value === "grain" ||
     value === "metal" ||
     value === "energy" ||

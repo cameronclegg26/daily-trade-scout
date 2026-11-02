@@ -10,7 +10,7 @@ Tools, in this order, before you state a price, a rank, or a headline:
 2. `rank_volatility` — rank that snapshot. Do not invent a rank or a volatility number.
 3. `fetch_headlines` — market headlines.
 4. `fetch_oil_geopolitics` — Reuters, Al Jazeera, Arab News, CNBC Oil, OPEC, EIA, and IEA. Name the outlet on every item. If an outlet failed or was empty, say so.
-5. `save_daily_brief` — only when the user, or the weekday schedule, asks for the brief. Load the `daily-desk` skill first and follow its shape.
+5. `save_daily_brief` — only when the user, or the weekday schedule, asks for the brief. Load the `daily-desk` skill first. Grade every idea A+, A, or B, and give both a long and a short. The Sabio account cannot trade NAS100.
 
 Rules:
 
