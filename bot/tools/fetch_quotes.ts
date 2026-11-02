@@ -5,14 +5,14 @@ import { SNAPSHOT_KEY, fetchQuotes, knownIds, publicQuotes, sessionSnapshotKey }
 
 export default defineTool({
   description: prompt`
-    Fetch the desk quote snapshot: stocks, wheat, corn, soybeans, copper,
-    WTI, and BTC, SOL, HYPE. Stores daily closes for rank_volatility.
-    Read-only. Never places an order.
+    Fetch the desk quote snapshot, including the strategy watchlist
+    (gold, US500, US30, QQQ, GBPUSD, EURUSD, USDJPY, WTI, BTC, ETH, SOL, ZEC).
+    Stores daily closes for rank_volatility. Read-only. Never places an order.
   `,
   inputSchema: z.object({
     ids: z
       .array(z.string().min(1).max(24))
-      .max(20)
+      .max(32)
       .optional()
       .describe("Instrument ids. Omit this to load the full universe."),
   }),

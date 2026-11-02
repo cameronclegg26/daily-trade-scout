@@ -20,6 +20,25 @@ The brief is framed for **Sabio Trade** (the main prop account, where most of th
 
 HYPE uses the Yahoo symbol `HYPE32196-USD`. If that chart is missing, the tool falls back to the CoinGecko `hyperliquid` series.
 
+The strategy watchlist is also in the quote tool: GOLD (`GC=F`), US500 (`ES=F`), US30 (`YM=F`), QQQ, SQQQ, TQQQ, GBPUSD, EURUSD, USDJPY, WTI, BTC, ETH, SOL, and ZEC. Sabio cannot trade NAS100. Use US500, US30, QQQ, SQQQ, or TQQQ instead.
+
+## Strategy scanner
+
+`scanner/` is a rules check with no model and no tokens. It does not place orders. There is no broker client and no wallet client in this script.
+
+It pulls Yahoo prices, checks that the daily, 4h, and 1h trends agree, looks for a break or retest of the previous day's high or low, the Asia and London session highs and lows, and round numbers, then applies the risk and UK timing rules in `bot/skills/daily-desk.md`. An A or A+ setup appends one line to `alerts/YYYY-MM-DD.md` (Europe/London date) and prints that line. The line includes the other side as a paired setup. A B grade by itself is not written.
+
+```bash
+npm run scan          # one pass
+npm run scan:loop     # repeat every 15 minutes
+```
+
+`NTFY_TOPIC` in `.env` sends that same line to `https://ntfy.sh/<topic>`. Leave it empty and push stays off. The topic is 1–64 letters, digits, `_`, or `-`.
+
+Two optional switches stay off unless you set them to `1`: `SCAN_HOT_US_DATA` blocks gold after 13:00 UK, and `SCAN_QQQ_EARNINGS_MISS` blocks a QQQ long until the 1h chart makes a higher low. The scanner cannot see headlines, earnings, midterms, or Iran nights by itself. The brief applies those from the news tools.
+
+Paper results live in `scanner/state.json` (not committed). Two losses or -$400 stops new alerts for the London day. Open risk is capped at $600. A stop is never widened. See `alerts/README.md`.
+
 Volatility is the sample standard deviation of daily log returns over 20 sessions, annualized with `sqrt(252)`. Names with too little history stay unranked.
 
 ## Setup

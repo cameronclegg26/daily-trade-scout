@@ -3,3 +3,5 @@ node_modules
 .env.local
 .agent-serve
 memory
+scanner/state.json
+alerts/20*.md

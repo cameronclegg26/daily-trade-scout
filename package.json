@@ -8,6 +8,8 @@
   },
   "scripts": {
     "check": "tsc --noEmit",
+    "scan": "tsx scanner/scan.ts",
+    "scan:loop": "tsx scanner/scan.ts --loop",
     "validate": "agent-sdk validate --dir .",
     "dev": "agent-sdk dev",
     "info": "agent-sdk info --dir ."
@@ -18,6 +20,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
+    "tsx": "4.23.15",
     "typescript": "6.0.3"
   }
 }
