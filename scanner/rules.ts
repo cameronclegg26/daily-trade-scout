@@ -2,6 +2,7 @@
 
 import { londonClock, londonDate, timingBlock, type LondonClock } from "./clock.js";
 import type { Bar } from "./yahoo.js";
+import { assessVolume, type VolumeTrigger } from "./volume.js";
 import { formatPrice, sizeText, type Spec } from "./universe.js";
 
 export type Side = "long" | "short";
@@ -18,6 +19,8 @@ export type Setup = {
   target: number | null;
   level: string | null;
   trigger: string | null;
+  /** Plain-language volume check. Does not change the grade. */
+  volumeLine: string;
   size: string;
   reason: string;
 };
@@ -80,8 +83,8 @@ export function evaluateSymbol(
     ctx.oilChangePercent > 1.5 &&
     ctx.us500ChangePercent < 0;
 
-  const long = gradeSide(spec, "long", price, frames, levels, h1);
-  const short = gradeSide(spec, "short", price, frames, levels, h1);
+  const long = gradeSide(spec, "long", price, frames, levels, h1, ctx.now.getTime());
+  const short = gradeSide(spec, "short", price, frames, levels, h1, ctx.now.getTime());
   applyEventRules(spec, long, short, {
     freshYearLow,
     reclaimed,
@@ -108,22 +111,31 @@ function gradeSide(
   frames: { daily: Frame; h4: Frame; h1: Frame },
   levels: Level[],
   h1: readonly Bar[],
+  nowMs: number,
 ): Setup {
   const wanted: Dir = side === "long" ? "up" : "down";
   const aligned = [frames.daily, frames.h4, frames.h1].every((frame) => frame.dir === wanted);
+  const volumeFor = (trigger: VolumeTrigger) => assessVolume(spec, side, trigger, h1, nowMs).line;
   if (!aligned) {
     return {
       ...emptySetup(spec, side, "daily, 4h, and 1h do not agree"),
       entry: price,
+      volumeLine: volumeFor(null),
     };
   }
   const strong = [frames.daily, frames.h4, frames.h1].every((frame) => frame.ma && frame.structure);
   const trigger = findTrigger(spec, side, price, levels, h1);
   if (!trigger) {
-    return { ...emptySetup(spec, side, "no break or retest of a key level"), entry: price, grade: "B" };
+    return {
+      ...emptySetup(spec, side, "no break or retest of a key level"),
+      entry: price,
+      grade: "B",
+      volumeLine: volumeFor(null),
+    };
   }
+  const volumeLine = volumeFor(trigger.kind);
   if (trigger.chase) {
-    return numbered(spec, side, price, trigger, levels, "chase is more than 0.3R past the level", "B");
+    return numbered(spec, side, price, trigger, levels, "chase is more than 0.3R past the level", "B", volumeLine);
   }
   return numbered(
     spec,
@@ -133,6 +145,7 @@ function gradeSide(
     levels,
     strong ? "D/4H/1H agree on structure and the 20/50 averages" : "D/4H/1H agree",
     strong ? "A+" : "A",
+    volumeLine,
   );
 }
 
@@ -224,6 +237,7 @@ function numbered(
   levels: Level[],
   reason: string,
   grade: Grade,
+  volumeLine: string,
 ): Setup {
   const oneR = side === "long" ? entry + trigger.r : entry - trigger.r;
   const half = nearerHalf(side, entry, trigger.r, levels, trigger.level.price, oneR);
@@ -239,6 +253,7 @@ function numbered(
     target,
     level: `${trigger.level.name} ${formatPrice(spec, trigger.level.price)}`,
     trigger: trigger.kind,
+    volumeLine,
     size: sizeText(spec, Math.abs(entry - trigger.stop)),
     reason,
   };
@@ -397,6 +412,7 @@ function emptySetup(spec: Spec, side: Side, reason: string): Setup {
     target: null,
     level: null,
     trigger: null,
+    volumeLine: "Volume: not available (no reliable traded volume in the feed)",
     size: sizeText(spec, 0),
     reason,
   };
@@ -420,6 +436,7 @@ export function formatSetup(spec: Spec, setup: Setup, clock: LondonClock): strin
     `size ${setup.size}`,
     setup.level ?? "no level",
     setup.trigger ?? "no trigger",
+    setup.volumeLine,
     setup.reason,
   ].join(" | ");
 }

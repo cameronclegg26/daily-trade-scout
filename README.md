@@ -26,7 +26,19 @@ The strategy watchlist is also in the quote tool: GOLD (`GC=F`), US500 (`ES=F`),
 
 `scanner/` is a rules check with no model and no tokens. It does not place orders. There is no broker client and no wallet client in this script.
 
-It pulls Yahoo prices, checks that the daily, 4h, and 1h trends agree, looks for a break or retest of the previous day's high or low, the Asia and London session highs and lows, and round numbers, then applies the risk and UK timing rules in `bot/skills/daily-desk.md`. An A or A+ setup appends one line to `alerts/YYYY-MM-DD.md` (Europe/London date) and prints that line. The line includes the other side as a paired setup. A B grade by itself is not written.
+It pulls Yahoo v8 chart prices (the v7 quote API is not used), checks that the daily, 4h, and 1h trends agree, looks for a break or retest of the previous day's high or low, the Asia and London session highs and lows, and round numbers, then applies the risk and UK timing rules in `bot/skills/daily-desk.md`. An A or A+ setup appends one line to `alerts/YYYY-MM-DD.md` (Europe/London date) and prints that line. The line includes the other side as a paired setup. A B grade by itself is not written.
+
+Each of those lines has a volume check before the reason, so you can see whether volume is backing the move before you enter. The grade stays A or A+. Volume does not add a new grade and it does not turn an A into a B.
+
+The figure is the setup hour compared with the previous 20 hours that actually traded. `1.8x average` means that hour was 1.8 times a normal hour. A still-open hour that is at least 15 minutes old is scaled to a full hour, so a half-finished hour is not called quiet just because it has not ended. Under 15 minutes, the line uses the last closed hour and says so, unless this hour has already traded at least 1.2 times a normal full hour.
+
+Volume **backs the move** on a break or retest when that hour is at least 1.2x the recent average, or it is expanding (at least 10% busier than the previous hour and the previous three hours), and volume is not fading. The line reads `Volume: backing the move (1.8x average)`.
+
+Volume is **not confirming** when the hour is below that average (`light` or `not above average`), when the bar closed against the trade (`against the move`), or when price has pushed further over the last four hours while volume fell on each of the last three (`diverging`). Example: `Volume: not confirming (light, 0.6x average)`.
+
+Gold (`GC=F`), crypto (BTC, ETH, SOL, ZEC), the listed ETF QQQ, index futures, and oil use this when the v8 chart has traded volume. The same rule applies to any other non-forex name the scanner covers. Spot forex (GBP/USD, EUR/USD, USD/JPY) does not: Yahoo's volume for those pairs is zeros, not traded volume, so the line is `Volume: not available (spot forex has no reliable traded volume)`. A missing or empty print is also "not available". When the setup hour has already closed, including a stock before the cash session opens, the figure is that last hour and the line says `last closed hour`. The scanner never fills in a made-up number.
+
+A brief that lists a setup copies this line from today's alert. If the alert has no volume figure, the brief says volume is not available.
 
 ```bash
 npm run scan          # one pass
