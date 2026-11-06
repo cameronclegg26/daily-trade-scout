@@ -1,6 +1,7 @@
 // Rules-only scanner. No model, no tokens, no orders.
 import { readFile } from "node:fs/promises";
 import { londonClock, timingBlock } from "./clock.js";
+import { withHint } from "./desk.js";
 import {
   alreadyTracked,
   appendAlert,
@@ -9,13 +10,16 @@ import {
   ideaKey,
   loadBook,
   markToMarket,
+  noteValidity,
   openRisk,
+  rearmIdea,
   riskBlock,
   saveBook,
   trackIdea,
 } from "./journal.js";
-import { alertable, dayChangePercent, evaluateSymbol, formatSetup } from "./rules.js";
+import { alertable, dayChangePercent, evaluateSymbol, formatSetup, type SymbolPlan } from "./rules.js";
 import { WATCHLIST, type Spec } from "./universe.js";
+import { drainTelegram, hintChatId, sendTelegram, telegramReady } from "./telegram.js";
 import { fetchBars, resample4h, type Bar } from "./yahoo.js";
 
 const LOOP_MS = 15 * 60 * 1000;
@@ -33,15 +37,49 @@ async function main(): Promise<void> {
       console.error(err instanceof Error ? err.message : "scan failed");
     }
     if (!loop) break;
-    await new Promise((resolve) => setTimeout(resolve, LOOP_MS));
+    await waitForNextScan(LOOP_MS);
   } while (loop);
+}
+
+async function waitForNextScan(ms: number): Promise<void> {
+  await loadEnvFile();
+  if (!telegramReady()) {
+    await sleep(ms);
+    return;
+  }
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    const remain = end - Date.now();
+    const timeout = Math.max(1, Math.min(25, Math.floor(remain / 1000)));
+    try {
+      await ingestIdle(timeout);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : "telegram listen failed");
+      await sleep(Math.min(5_000, remain));
+    }
+  }
+}
+
+async function ingestIdle(timeout: number): Promise<void> {
+  const now = new Date();
+  const book = await loadBook(londonClock(now).date);
+  const offset = book.telegramOffset;
+  const ideas = JSON.stringify(book.ideas);
+  await drainTelegram(book, now, timeout);
+  if (book.telegramOffset !== offset || JSON.stringify(book.ideas) !== ideas) await saveBook(book);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function scanOnce(): Promise<void> {
   await loadEnvFile();
+  await hintChatId();
   const now = new Date();
   const clock = londonClock(now);
   const book = await loadBook(clock.date);
+  await drainTelegram(book, now, 0);
   const packs = await mapPool(WATCHLIST, 3, loadPack);
   const lessons: string[] = [];
   for (const pack of packs) {
@@ -62,28 +100,40 @@ async function scanOnce(): Promise<void> {
   };
 
   let alerts = 0;
-  const blocked = riskBlock(book);
+  const ready: { spec: Spec; plan: SymbolPlan }[] = [];
   for (const pack of packs) {
     if (!pack.ok) {
       console.log(`${clock.label} UK | ${pack.spec.id} | data error | ${pack.error}`);
       continue;
     }
-    const plan = evaluateSymbol(pack.spec, pack.daily, pack.h1, pack.h4, pack.m15, ctx);
-    for (const setup of [plan.long, plan.short]) {
+    ready.push({ spec: pack.spec, plan: evaluateSymbol(pack.spec, pack.daily, pack.h1, pack.h4, pack.m15, ctx) });
+  }
+
+  for (const idea of book.ideas) {
+    if (idea.status !== "skipped") continue;
+    const row = ready.find((item) => item.spec.id === idea.symbol);
+    const setup = row == null ? null : idea.side === "long" ? row.plan.long : row.plan.short;
+    const live =
+      setup != null &&
+      setup.stop != null &&
+      setup.r != null &&
+      alertable(setup, clock).ok &&
+      riskBlock(book) == null;
+    if (noteValidity(idea, live) !== "ping" || setup == null || row == null) continue;
+    rearmIdea(idea, setup, now.toISOString(), book.date);
+    alerts += await publish(row.spec, row.plan, idea.side, clock, true);
+  }
+
+  for (const row of ready) {
+    for (const setup of [row.plan.long, row.plan.short]) {
       const gate = alertable(setup, clock);
-      if (!gate.ok || blocked) continue;
-      if (riskBlock(book)) continue;
+      if (!gate.ok || riskBlock(book)) continue;
       if (directionFlip(book, setup.symbol, setup.side)) continue;
       const key = ideaKey(setup, book.date);
       if (alreadyTracked(book, key, setup.symbol, setup.side)) continue;
       if (setup.stop == null || setup.r == null) continue;
-      const paired = setup.side === "long" ? plan.short : plan.long;
-      const line = `${formatSetup(pack.spec, setup, clock)} | paired ${paired.side.toUpperCase()} ${paired.grade}: ${paired.reason}`;
-      await appendAlert(clock.date, line);
-      console.log(line);
-      await push(line);
       trackIdea(book, setup, now.toISOString());
-      alerts += 1;
+      alerts += await publish(row.spec, row.plan, setup.side, clock, true);
     }
   }
 
@@ -91,13 +141,15 @@ async function scanOnce(): Promise<void> {
     const line = `${clock.label} UK | LESSON | ${lesson}`;
     await appendAlert(clock.date, line);
     console.log(line);
-    await push(line);
+    await push(line, false);
   }
   await saveBook(book);
+  const blocked = riskBlock(book);
   const timing = timingBlock(clock);
+  const pending = book.ideas.filter((idea) => idea.status === "pending").length;
   const note = [blocked, timing].filter((item) => item).join(" | ");
   console.log(
-    `${clock.date} ${clock.label} UK | scanned ${WATCHLIST.length} | alerts ${alerts} | day pnl ${book.dayPnl} | losses ${book.losses} | open risk ${openRisk(book)}${note ? ` | ${note}` : ""} | alerts only, no orders`,
+    `${clock.date} ${clock.label} UK | scanned ${WATCHLIST.length} | alerts ${alerts} | pending ${pending} | day pnl ${book.dayPnl} | losses ${book.losses} | open risk ${openRisk(book)}${note ? ` | ${note}` : ""} | alerts only, no orders`,
   );
 }
 
@@ -117,7 +169,28 @@ async function loadPack(spec: Spec): Promise<Pack> {
   }
 }
 
-async function push(line: string): Promise<void> {
+async function publish(
+  spec: Spec,
+  plan: SymbolPlan,
+  side: "long" | "short",
+  clock: ReturnType<typeof londonClock>,
+  trade: boolean,
+): Promise<number> {
+  const setup = side === "long" ? plan.long : plan.short;
+  const paired = side === "long" ? plan.short : plan.long;
+  const line = `${formatSetup(spec, setup, clock)} | paired ${paired.side.toUpperCase()} ${paired.grade}: ${paired.reason}`;
+  await appendAlert(clock.date, line);
+  console.log(line);
+  await push(line, trade);
+  return 1;
+}
+
+async function push(line: string, trade: boolean): Promise<void> {
+  await pushNtfy(line);
+  await sendTelegram(trade ? withHint(line) : `${line}\n\nResearch only. No order was sent.`);
+}
+
+async function pushNtfy(line: string): Promise<void> {
   const topic = process.env.NTFY_TOPIC?.trim() ?? "";
   if (!topic) return;
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(topic)) {
