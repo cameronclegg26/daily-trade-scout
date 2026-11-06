@@ -8,6 +8,8 @@ The brief is framed for **Sabio Trade** (the main prop account, where most of th
 
 **This agent does not place live orders.** It has no broker client, no exchange client, and no wallet execution code. It does not sign transactions or send them. Every saved brief says the same thing. Use it for education and research only.
 
+To see the watchlist in a browser on this PC, start Scout Desk with `npm run desk`. It is a local page. It does not place orders.
+
 ## What it watches
 
 | Id | Market | Sleeve |
@@ -50,6 +52,20 @@ npm run scan:loop     # repeat every 15 minutes
 Two optional switches stay off unless you set them to `1`: `SCAN_HOT_US_DATA` blocks gold after 13:00 UK, and `SCAN_QQQ_EARNINGS_MISS` blocks a QQQ long until the 1h chart makes a higher low. The scanner cannot see headlines, earnings, midterms, or Iran nights by itself. The brief applies those from the news tools.
 
 Paper results live in `scanner/state.json` (not committed). Two losses or -$400 stops new alerts for the London day. Open risk is capped at $600. A stop is never widened. See `alerts/README.md`.
+
+## Scout Desk
+
+Scout Desk is a local watchlist you open in a browser on the same PC as the scanner. The page is dark, with amber labels, white prices, green for up, and red for down. It is research only. It does not place orders, it has no broker fields, and it does not ask for an exchange key.
+
+```bash
+npm run desk
+```
+
+The command prints `http://127.0.0.1:3847` and tries to open it. The server listens on `127.0.0.1` only, so it is not reachable from another computer. Set `DESK_PORT` to use another port. Set `DESK_NO_OPEN=1` when you would rather paste the address yourself (this is the right switch on Windows if the browser does not open).
+
+The board lists every name in `scanner/universe.ts`. Add a symbol there and the next refresh shows it. Prices, the 1-hour chart, and the volume line come from the same Yahoo v8 chart feed as `npm run scan`. The volume words are the scanner's own check (`backing the move`, `not confirming` with the relative-volume multiple, or `not available`). Spot forex stays `not available`. The desk does not fill in a figure.
+
+Today's A and A+ lines are read from `alerts/YYYY-MM-DD.md` (Europe/London). The page shows the entry, stop, half / 1R, 2R, trigger, and volume line from that file, and labels them as an alert / research plan. Run `npm run scan` to write the file. The desk reloads about once a minute. If there is no A or A+ line today, the page says so.
 
 Volatility is the sample standard deviation of daily log returns over 20 sessions, annualized with `sqrt(252)`. Names with too little history stay unranked.
 

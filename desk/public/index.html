@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scout Desk</title>
+    <link rel="stylesheet" href="/desk.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <h1>Scout Desk</h1>
+        <p>Local watchlist · Europe/London</p>
+      </div>
+      <time id="clock">—</time>
+      <div class="chip">Research only</div>
+    </header>
+    <div id="status" class="status">Loading prices from the public chart feed…</div>
+    <main class="workspace">
+      <section class="panel board-panel">
+        <div class="panel-head">
+          <h2>Watchlist</h2>
+          <button type="button" id="refresh">Refresh</button>
+        </div>
+        <div class="scroll" id="board"></div>
+      </section>
+      <section class="panel detail-panel">
+        <div class="panel-head">
+          <h2 id="detail-title">Quote</h2>
+        </div>
+        <div class="scroll" id="detail"></div>
+      </section>
+    </main>
+    <section class="panel ideas-panel">
+      <div class="panel-head">
+        <h2>Today's ideas</h2>
+        <p id="ideas-meta"></p>
+      </div>
+      <div class="scroll" id="ideas"></div>
+    </section>
+    <script src="/desk.js"></script>
+  </body>
+</html>
