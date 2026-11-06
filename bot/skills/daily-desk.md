@@ -45,6 +45,7 @@ Apply every rule below. The scanner in `scanner/` alerts only on A or A+. The br
 9. Events. No gold trades in the session after hot US data. After a megacap earnings miss, no NAS or QQQ long until New York makes a higher low. Do not hold a stock into its own earnings. On a risk-off day with oil up more than 1.5%, use index shorts or JPY/CHF longs, not gold longs. No long into a fresh one-year low on the first test. Wait for a 1h reclaim.
 10. Watchlist. The list in Sabio Trade and Phantom sleeve above. Do not invent a NAS100 ticket.
 11. Log. If `alerts/` or `scanner/state.json` is in the workspace, read today's file and record each idea's win or loss. Then write one daily lesson. If the log is absent, say so, and still write one lesson from the research.
+12. Volume, before he would enter. On every long and every short, add one volume line. This does not change the A+, A, or B grade. Copy the scanner's volume clause from today's `alerts/` file when that symbol has one. If it does not, write `Volume: not available` and do not invent a multiple. Spot forex (GBP/USD, EUR/USD, USD/JPY) is always `Volume: not available (spot forex has no reliable traded volume)`. Gold, crypto, and listed stocks such as QQQ use the same plain-language line: `Volume: backing the move (1.8x average)` when the break or retest is at least 1.2x the recent 20 traded hours or volume is expanding, and `Volume: not confirming (light / diverging)` when it is not. A light-volume A is still an A. Say so, so it is not treated as a stronger setup.
 
 ## Oil and geopolitics
 

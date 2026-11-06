@@ -22,7 +22,9 @@ export const WATCHLIST: readonly Spec[] = [
   { id: "GOLD", name: "Gold", yahoo: "GC=F", kind: "gold", round: 10, digits: 2, dollarsPerPointPer10oz: 10 },
   { id: "US500", name: "US500", yahoo: "ES=F", kind: "index", round: 25, digits: 2 },
   { id: "US30", name: "US30", yahoo: "YM=F", kind: "index", round: 100, digits: 0 },
+  // Listed ETF. Share volume is read the same way as gold and crypto.
   { id: "QQQ", name: "QQQ", yahoo: "QQQ", kind: "index", round: 1, digits: 2 },
+  // Spot FX. Yahoo volume for these is zeros, not traded volume. The scanner does not invent a figure.
   { id: "GBPUSD", name: "GBP/USD", yahoo: "GBPUSD=X", kind: "fx", round: 0.005, digits: 5, pip: 0.0001, dollarsPerPipPerLot: 10 },
   { id: "EURUSD", name: "EUR/USD", yahoo: "EURUSD=X", kind: "fx", round: 0.005, digits: 5, pip: 0.0001, dollarsPerPipPerLot: 10 },
   { id: "USDJPY", name: "USD/JPY", yahoo: "JPY=X", kind: "fx", round: 0.5, digits: 3, pip: 0.01, dollarsPerPipPerLot: 6.33 },

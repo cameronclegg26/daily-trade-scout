@@ -8,6 +8,7 @@
   },
   "scripts": {
     "check": "tsc --noEmit",
+    "test": "tsx --test scanner/volume.test.ts",
     "scan": "tsx scanner/scan.ts",
     "scan:loop": "tsx scanner/scan.ts --loop",
     "validate": "agent-sdk validate --dir .",
