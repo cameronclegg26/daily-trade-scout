@@ -7,6 +7,8 @@ import type { Setup } from "./rules.js";
 import { DAY_LOSS_LIMIT, MAX_DAY_LOSSES, MAX_OPEN_RISK, RISK_DOLLARS, type Spec } from "./universe.js";
 import type { Bar } from "./yahoo.js";
 
+export type IdeaStatus = "pending" | "open" | "skipped" | "win" | "loss" | "scratch";
+
 export type Idea = {
   key: string;
   symbol: string;
@@ -17,9 +19,12 @@ export type Idea = {
   r: number;
   half: number;
   target: number;
+  level: string | null;
   openedAt: string;
   openedOn: string;
-  status: "open" | "win" | "loss" | "scratch";
+  /** pending: alert sent, no fill yet. skipped: user passed. armed: that signal has since died. */
+  status: IdeaStatus;
+  armed: boolean;
   partial: boolean;
   pnl: number;
 };
@@ -29,6 +34,7 @@ export type Book = {
   dayPnl: number;
   losses: number;
   weekendNoted: boolean;
+  telegramOffset: number;
   ideas: Idea[];
 };
 
@@ -36,7 +42,7 @@ const STATE_PATH = path.resolve("scanner/state.json");
 const ALERTS_DIR = path.resolve("alerts");
 
 export function emptyBook(date: string): Book {
-  return { date, dayPnl: 0, losses: 0, weekendNoted: false, ideas: [] };
+  return { date, dayPnl: 0, losses: 0, weekendNoted: false, telegramOffset: 0, ideas: [] };
 }
 
 export async function loadBook(date: string): Promise<Book> {
@@ -47,7 +53,8 @@ export async function loadBook(date: string): Promise<Book> {
       dayPnl: typeof parsed.dayPnl === "number" ? parsed.dayPnl : 0,
       losses: typeof parsed.losses === "number" ? parsed.losses : 0,
       weekendNoted: parsed.weekendNoted === true,
-      ideas: Array.isArray(parsed.ideas) ? parsed.ideas.filter(isIdea) : [],
+      telegramOffset: typeof parsed.telegramOffset === "number" ? parsed.telegramOffset : 0,
+      ideas: Array.isArray(parsed.ideas) ? parsed.ideas.filter(isIdea).map(normalizeIdea) : [],
     };
     if (book.date !== date) {
       return {
@@ -55,6 +62,7 @@ export async function loadBook(date: string): Promise<Book> {
         dayPnl: 0,
         losses: 0,
         weekendNoted: false,
+        telegramOffset: book.telegramOffset,
         ideas: book.ideas.filter((idea) => idea.status === "open"),
       };
     }
@@ -70,7 +78,7 @@ export async function saveBook(book: Book): Promise<void> {
 }
 
 export function openRisk(book: Book): number {
-  return book.ideas.filter((idea) => idea.status === "open" && !idea.partial).length * RISK_DOLLARS;
+  return book.ideas.filter((idea) => (idea.status === "open" || idea.status === "pending") && !idea.partial).length * RISK_DOLLARS;
 }
 
 export function riskBlock(book: Book): string | null {
@@ -81,13 +89,22 @@ export function riskBlock(book: Book): string | null {
 }
 
 export function directionFlip(book: Book, symbol: string, side: Idea["side"]): boolean {
-  return book.ideas.some((idea) => idea.symbol === symbol && idea.side !== side && idea.openedOn === book.date);
+  return book.ideas.some(
+    (idea) =>
+      idea.symbol === symbol &&
+      idea.side !== side &&
+      idea.openedOn === book.date &&
+      idea.status !== "skipped",
+  );
 }
 
 export function alreadyTracked(book: Book, key: string, symbol: string, side: Idea["side"]): boolean {
-  return book.ideas.some(
-    (idea) => idea.key === key || (idea.symbol === symbol && idea.side === side && idea.status === "open"),
-  );
+  return book.ideas.some((idea) => {
+    const sameSide = idea.symbol === symbol && idea.side === side;
+    if (!sameSide && idea.key !== key) return false;
+    if (idea.status === "pending" || idea.status === "open") return true;
+    return idea.status === "skipped" && !idea.armed && sameSide;
+  });
 }
 
 export function ideaKey(setup: Setup, date: string): string {
@@ -105,14 +122,84 @@ export function trackIdea(book: Book, setup: Setup, openedAt: string): Idea {
     r: setup.r ?? 0,
     half: setup.half ?? setup.entry,
     target: setup.target ?? setup.entry,
+    level: setup.level,
     openedAt,
     openedOn: book.date,
-    status: "open",
+    status: "pending",
+    armed: false,
     partial: false,
     pnl: 0,
   };
   book.ideas.push(idea);
   return idea;
+}
+
+/** A skipped idea pings once the old signal has died and a fresh A or A+ is back. */
+export function noteValidity(idea: Idea, live: boolean): "silent" | "ping" {
+  if (idea.status !== "skipped") return "silent";
+  if (!live) {
+    idea.armed = true;
+    return "silent";
+  }
+  if (!idea.armed) return "silent";
+  return "ping";
+}
+
+export function rearmIdea(idea: Idea, setup: Setup, openedAt: string, date: string): void {
+  idea.key = ideaKey(setup, date);
+  idea.grade = setup.grade === "A+" ? "A+" : "A";
+  idea.entry = setup.entry;
+  idea.stop = setup.stop ?? setup.entry;
+  idea.r = setup.r ?? 0;
+  idea.half = setup.half ?? setup.entry;
+  idea.target = setup.target ?? setup.entry;
+  idea.level = setup.level;
+  idea.openedAt = openedAt;
+  idea.openedOn = date;
+  idea.status = "pending";
+  idea.armed = false;
+  idea.partial = false;
+  idea.pnl = 0;
+}
+
+export type ReplyAction = "skip" | "placed" | "when";
+
+export type ReplyResult =
+  | { kind: "none"; symbol?: string }
+  | { kind: "skip"; idea: Idea }
+  | { kind: "already-skipped"; idea: Idea }
+  | { kind: "placed"; idea: Idea }
+  | { kind: "already-open"; idea: Idea }
+  | { kind: "closed"; idea: Idea }
+  | { kind: "when"; idea: Idea | null };
+
+export function applyReply(book: Book, action: ReplyAction, symbol: string | undefined, nowIso: string): ReplyResult {
+  const idea = pickIdea(book, symbol);
+  if (action === "when") return { kind: "when", idea };
+  if (!idea) return { kind: "none", symbol };
+  if (idea.status === "win" || idea.status === "loss" || idea.status === "scratch") return { kind: "closed", idea };
+  if (action === "skip") {
+    if (idea.status === "skipped") return { kind: "already-skipped", idea };
+    if (idea.status === "open" && (idea.partial || idea.pnl !== 0)) return { kind: "closed", idea };
+    idea.status = "skipped";
+    idea.armed = false;
+    return { kind: "skip", idea };
+  }
+  if (idea.status === "open") return { kind: "already-open", idea };
+  idea.status = "open";
+  idea.armed = false;
+  idea.openedAt = nowIso;
+  return { kind: "placed", idea };
+}
+
+export function pickIdea(book: Book, symbol: string | undefined): Idea | null {
+  const rows = book.ideas.filter(
+    (idea) =>
+      (idea.status === "pending" || idea.status === "skipped" || idea.status === "open") &&
+      (symbol == null || idea.symbol === symbol),
+  );
+  rows.sort((a, b) => (a.openedAt < b.openedAt ? 1 : -1));
+  return rows[0] ?? null;
 }
 
 /** Update open ideas from bars since they were opened. Returns lesson lines. */
@@ -187,8 +274,22 @@ export async function appendAlert(date: string, line: string): Promise<void> {
   await appendFile(file, `${header}${line}\n`, "utf8");
 }
 
+const STATUSES: readonly IdeaStatus[] = ["pending", "open", "skipped", "win", "loss", "scratch"];
+
 function isIdea(value: unknown): value is Idea {
   if (!value || typeof value !== "object") return false;
   const idea = value as Partial<Idea>;
   return typeof idea.key === "string" && typeof idea.symbol === "string" && (idea.side === "long" || idea.side === "short");
+}
+
+function normalizeIdea(idea: Idea): Idea {
+  const status = STATUSES.includes(idea.status) ? idea.status : "open";
+  return {
+    ...idea,
+    status,
+    level: typeof idea.level === "string" ? idea.level : null,
+    armed: idea.armed === true,
+    partial: idea.partial === true,
+    pnl: typeof idea.pnl === "number" ? idea.pnl : 0,
+  };
 }

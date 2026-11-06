@@ -4,4 +4,4 @@
 
 Each file starts with a research-only line. The scanner does not place live orders. It has no broker connection and it does not sign or send wallet transactions.
 
-A lesson line is added when a paper idea hits its stop, its half target, or its 2R target, and when an open idea is flattened before the weekend.
+A new A or A+ line is pending. It becomes an open paper idea only after a Telegram reply of `placed`. `not placed` keeps it off the book until that side sets up again. A lesson line is added when an open idea hits its stop, its half target, or its 2R target, and when an open idea is flattened before the weekend.

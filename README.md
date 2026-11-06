@@ -35,9 +35,21 @@ npm run scan:loop     # repeat every 15 minutes
 
 `NTFY_TOPIC` in `.env` sends that same line to `https://ntfy.sh/<topic>`. Leave it empty and push stays off. The topic is 1–64 letters, digits, `_`, or `-`.
 
+Telegram uses the same alert. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in `.env`. Create the bot with @BotFather (`/newbot`), open it, tap Start, then run `npm run scan` once. The scanner prints the chat id. `npm run scan:loop` keeps the process up and reads replies within about 25 seconds. Leave both values empty and Telegram stays off.
+
+An alert is pending until you answer. It is not a fill, and a paper loss is not booked.
+
+| Reply | Effect |
+| --- | --- |
+| `not placed` | Takes that idea off the book. The scanner messages you when that side is a fresh A or A+ again. |
+| `placed` | Marks it open from that moment. Later scans message a stop, a half, or 2R. |
+| `when` | Replies with the idea and the next UK pause. Pauses are 13:15–13:45, 14:15–15:15, and Friday from 20:00. |
+
+Add a symbol when more than one idea is waiting: `not placed US30`. The bot only accepts those phrases. It still does not place an order.
+
 Two optional switches stay off unless you set them to `1`: `SCAN_HOT_US_DATA` blocks gold after 13:00 UK, and `SCAN_QQQ_EARNINGS_MISS` blocks a QQQ long until the 1h chart makes a higher low. The scanner cannot see headlines, earnings, midterms, or Iran nights by itself. The brief applies those from the news tools.
 
-Paper results live in `scanner/state.json` (not committed). Two losses or -$400 stops new alerts for the London day. Open risk is capped at $600. A stop is never widened. See `alerts/README.md`.
+Paper results live in `scanner/state.json` (not committed). A pending alert counts toward the $600 open-risk cap until you reply `not placed`. Losses count only after you reply `placed`. Two losses or -$400 stops new alerts for the London day. A stop is never widened. See `alerts/README.md`.
 
 Volatility is the sample standard deviation of daily log returns over 20 sessions, annualized with `sqrt(252)`. Names with too little history stay unranked.
 
