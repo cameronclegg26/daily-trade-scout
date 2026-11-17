@@ -10,6 +10,9 @@
     "check": "tsc --noEmit",
     "scan": "tsx scanner/scan.ts",
     "scan:loop": "tsx scanner/scan.ts --loop",
+    "crypto": "tsx scanner/scan-crypto.ts",
+    "crypto:loop": "tsx scanner/scan-crypto.ts --loop",
+    "test": "tsx --test scanner/crypto.test.ts",
     "validate": "agent-sdk validate --dir .",
     "dev": "agent-sdk dev",
     "info": "agent-sdk info --dir ."

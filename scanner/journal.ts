@@ -30,6 +30,8 @@ export type Book = {
   losses: number;
   weekendNoted: boolean;
   ideas: Idea[];
+  /** Crypto scanner only: watch-only keys that are not paper entries. */
+  watches?: string[];
 };
 
 const STATE_PATH = path.resolve("scanner/state.json");
@@ -39,9 +41,10 @@ export function emptyBook(date: string): Book {
   return { date, dayPnl: 0, losses: 0, weekendNoted: false, ideas: [] };
 }
 
-export async function loadBook(date: string): Promise<Book> {
+export async function loadBook(date: string, statePath: string = STATE_PATH): Promise<Book> {
   try {
-    const parsed = JSON.parse(await readFile(STATE_PATH, "utf8")) as Partial<Book>;
+    const parsed = JSON.parse(await readFile(statePath, "utf8")) as Partial<Book>;
+    const watches = readWatches(parsed.watches);
     const book: Book = {
       date: typeof parsed.date === "string" ? parsed.date : date,
       dayPnl: typeof parsed.dayPnl === "number" ? parsed.dayPnl : 0,
@@ -49,6 +52,7 @@ export async function loadBook(date: string): Promise<Book> {
       weekendNoted: parsed.weekendNoted === true,
       ideas: Array.isArray(parsed.ideas) ? parsed.ideas.filter(isIdea) : [],
     };
+    if (watches.length > 0) book.watches = watches;
     if (book.date !== date) {
       return {
         date,
@@ -64,9 +68,9 @@ export async function loadBook(date: string): Promise<Book> {
   }
 }
 
-export async function saveBook(book: Book): Promise<void> {
-  await mkdir(path.dirname(STATE_PATH), { recursive: true });
-  await writeFile(STATE_PATH, `${JSON.stringify(book, null, 2)}\n`, "utf8");
+export async function saveBook(book: Book, statePath: string = STATE_PATH): Promise<void> {
+  await mkdir(path.dirname(statePath), { recursive: true });
+  await writeFile(statePath, `${JSON.stringify(book, null, 2)}\n`, "utf8");
 }
 
 export function openRisk(book: Book): number {
@@ -88,6 +92,18 @@ export function alreadyTracked(book: Book, key: string, symbol: string, side: Id
   return book.ideas.some(
     (idea) => idea.key === key || (idea.symbol === symbol && idea.side === side && idea.status === "open"),
   );
+}
+
+export function alreadyWatched(book: Book, key: string): boolean {
+  return book.watches?.includes(key) ?? false;
+}
+
+/** Remember a watch-only line. It is not an open idea and it does not use risk. */
+export function trackWatch(book: Book, key: string): void {
+  if (alreadyWatched(book, key)) return;
+  const watches = book.watches ?? [];
+  watches.push(key);
+  book.watches = watches;
 }
 
 export function ideaKey(setup: Setup, date: string): string {
@@ -170,9 +186,9 @@ export function flattenForWeekend(book: Book): string[] {
   return lessons;
 }
 
-export async function appendAlert(date: string, line: string): Promise<void> {
-  await mkdir(ALERTS_DIR, { recursive: true });
-  const file = path.join(ALERTS_DIR, `${date}.md`);
+export async function appendAlert(date: string, line: string, alertsDir: string = ALERTS_DIR): Promise<void> {
+  await mkdir(alertsDir, { recursive: true });
+  const file = path.join(alertsDir, `${date}.md`);
   let header = "";
   try {
     await readFile(file, "utf8");
@@ -185,6 +201,11 @@ export async function appendAlert(date: string, line: string): Promise<void> {
     ].join("\n");
   }
   await appendFile(file, `${header}${line}\n`, "utf8");
+}
+
+function readWatches(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item.length > 0);
 }
 
 function isIdea(value: unknown): value is Idea {
