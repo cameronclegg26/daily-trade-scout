@@ -4,4 +4,6 @@ node_modules
 .agent-serve
 memory
 scanner/state.json
+scanner/state-crypto.json
 alerts/20*.md
+alerts-crypto/20*.md

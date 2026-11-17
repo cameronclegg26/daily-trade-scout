@@ -33,6 +33,31 @@ export const WATCHLIST: readonly Spec[] = [
   { id: "ZEC", name: "Zcash", yahoo: "ZEC-USD", kind: "crypto", round: 5, digits: 2 },
 ];
 
+/** XRP is crypto-scanner only. Same Yahoo chart feed as the other coins, no key. */
+export const XRP_SPEC: Spec = {
+  id: "XRP",
+  name: "XRP",
+  yahoo: "XRP-USD",
+  kind: "crypto",
+  round: 0.01,
+  digits: 4,
+};
+
+function cryptoSpec(id: string): Spec {
+  const found = WATCHLIST.find((item) => item.id === id);
+  if (!found) throw new Error(`missing crypto spec ${id}`);
+  return found;
+}
+
+/** BTC, ETH, SOL, and ZEC reuse the weekday specs. XRP is added here only. */
+export const CRYPTO_WATCHLIST: readonly Spec[] = [
+  cryptoSpec("BTC"),
+  cryptoSpec("ETH"),
+  cryptoSpec("SOL"),
+  XRP_SPEC,
+  cryptoSpec("ZEC"),
+];
+
 export const RISK_DOLLARS = 200;
 export const MAX_OPEN_RISK = 600;
 export const DAY_LOSS_LIMIT = 400;

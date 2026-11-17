@@ -41,6 +41,35 @@ Paper results live in `scanner/state.json` (not committed). Two losses or -$400 
 
 Volatility is the sample standard deviation of daily log returns over 20 sessions, annualized with `sqrt(252)`. Names with too little history stay unranked.
 
+## Crypto scanner
+
+`scanner/scan-crypto.ts` is a second rules check. It watches only BTC, ETH, SOL, XRP, and ZEC. It uses the same A / A+ grades, key levels, 2R target, half off at 1R with the stop moved to entry, and $200 risk. It does not place orders. There is no broker client, no exchange client, and no wallet client.
+
+Prices come from the same Yahoo Finance chart feed the weekday scanner uses for crypto. No API key.
+
+| Coin | Yahoo symbol |
+| --- | --- |
+| BTC | `BTC-USD` |
+| ETH | `ETH-USD` |
+| SOL | `SOL-USD` |
+| XRP | `XRP-USD` |
+| ZEC | `ZEC-USD` |
+
+All five symbols returned a chart from that feed, so no second source is used. XRP is on this scanner only. The weekday watchlist is unchanged.
+
+Crypto trades all week, so this scanner does not stop on weekends or around the US data times. A line before 15:15 UK ends with `WATCH ONLY (before 15:15 UK rule)`. That line is not a paper entry. From 15:15 UK the same setup can be written again without the tag. Alerts go to `alerts-crypto/YYYY-MM-DD.md` (Europe/London), with the same research-only header as `alerts/`. Paper results are in `scanner/state-crypto.json`, separate from the weekday book. The same two-loss, -$400, and $600 open-risk limits apply to real entries.
+
+Volume confirmation is not on main. It exists only on the open pull request that adds `scanner/volume.ts` (branch `cursor/volume-confirmation-2fd2`). This scanner follows main, so a line has no volume clause.
+
+On Windows, double-click `start-crypto-scanner.bat`. A command window titled Crypto Scanner opens and repeats the scan every 15 minutes.
+
+```bash
+npm run crypto          # one pass
+npm run crypto:loop     # repeat every 15 minutes
+```
+
+`NTFY_TOPIC` in `.env` sends a crypto line to the same ntfy topic as the weekday scanner. Leave it empty and push stays off.
+
 ## Setup
 
 Requires Node.js 22.13 or newer. Do not use Bun.
